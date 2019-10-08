@@ -10,6 +10,7 @@ proj4.defs([
 ]);
 
 var config = {};
+
 var customConfig = {};
 var hardConfig = {
     title: 'geOrchestra mobile',
@@ -38,6 +39,12 @@ var SViewer = function() {
     var map;
     var view;
     var marker;
+
+    // debut modif CT 25/09/2019
+    SViewer.searchRVA = searchRVA;
+    SViewer.searchRVA.init(view, marker);
+    // FIN
+
 
     // ----- pseudoclasses ------------------------------------------------------------------------------------
 
@@ -212,6 +219,8 @@ var SViewer = function() {
 
 
 
+
+
     // ----- methods ------------------------------------------------------------------------------------
 
     /**
@@ -343,7 +352,9 @@ var SViewer = function() {
             config.lb = (lv+1)%n;
             config.layersBackground[config.lb].setVisible(true);
         }
-        sendInformationToParentPage();
+        // Debut modif CT 25/09/2019
+        searchRVA.sendInformationToParentPage();
+        // FIN
         return config.layersBackground[config.lb];
     }
 
@@ -485,7 +496,9 @@ var SViewer = function() {
             }
             $('#permalink').prop('href',permalinkQuery);
         }
-        sendInformationToParentPage();
+        // Debut modif CT 25/09/2019
+        searchRVA.sendInformationToParentPage();
+        // FIN
     }
 
 
@@ -1007,223 +1020,6 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         }
         return false;
     }
-//-------------------------------Rennes métropole---------------------------------------------------------------------------    
-    
-    dataAutocomplete = []; // store addresses and localities names. Used to display in autocompletion
-    dataAutocompleteCoordinates = []; // store addresses and localities names and coordinates. Used to display matching address or locality on the map
-    
-    /**
-     * method: getAddressesAsked
-     * Queries the api RVA (Référentiel Voies et Adresses) of Rennes Metropole 
-     * to find matching addresses and localities 
-     */
-    function getAddressesAsked() {
-    	dataAutocompleteCoordinates.splice(0, dataAutocompleteCoordinates.length);
-        dataAutocomplete.splice(0, dataAutocomplete.length);
-    	var adressAsked = $("#searchInput").val();
-    	var adressAskedSplit = adressAsked.split(','); 
-    	var adressAskedLowerCase = adressAsked.toLowerCase();
-    	var requestLanes = 'https://api-rva.sig.rennesmetropole.fr/?key=556ead9b7893a352bcf9&version=1.0&format=json&epsg=3948&cmd=getlanes&insee=all&query=' + adressAskedSplit[0];
-    	var requestAddresses = 'https://api-rva.sig.rennesmetropole.fr/?key=556ead9b7893a352bcf9&version=1.0&format=json&epsg=3948&cmd=getfulladdresses&query='+ adressAskedSplit[0];
-    	
-    	if (adressAskedSplit[0].length > 5) {
-	    	$.getJSON(requestLanes, function(dataApiJson) {
-	    		var data = dataApiJson.rva.answer;
-	    		if ((data.lanes).length > 0) {
-	    			data.lanes.forEach(function(lane) {
-	    				if (lane.type == 'Lieu-dit') {
-	    					var localityName = lane.name4 + ' (Lieu-dit)';
-	    					dataAutocomplete.push(localityName);
-	    					var laneUpperCornerSplit = lane.upperCorner.split(' ');
-	    					var laneInformations = [localityName, laneUpperCornerSplit[0], laneUpperCornerSplit[1]];
-	    					dataAutocompleteCoordinates.push(laneInformations);
-	    				}
-	    			});
-	    		 }
-	    	});
-	    	
-	    	$.getJSON(requestAddresses, function(dataApiJson) {
-	    		var data = dataApiJson.rva.answer;
-	    		if ( ((data.addresses).length > 0 )  ) {
-	    			data.addresses.forEach(function(address) {
-		    			if( ((address.addr3.toLowerCase().substring(0, adressAskedLowerCase.length)) == adressAskedLowerCase)
-		    				|| ((address.addr3.toLowerCase().includes(adressAskedLowerCase)) == true)) {
-		    				if (dataAutocomplete.indexOf(address.addr3) == -1) {
-		    					dataAutocomplete.push(address.addr3);
-			    				var addressInformations = [address.addr3, address.x, address.y];
-			    				dataAutocompleteCoordinates.push(addressInformations);
-		    				}
-	    				}
-	    			});
-	    		}
-	    	});
-    	}
-    }
-    
-    var options = {
-            minCharNumber: 3,
-            adjustWidth: false,
-            data: dataAutocomplete,
-            requestDelay: 150,
-            list: {
-                onClickEvent: function() {
-                	var addressSearch = $("#searchInput").val();
-                	dataAutocompleteCoordinates.forEach(function(data) {
-                		if (data[0] == addressSearch) {
-                			var xyCoord = [data[1], data[2]];
-                            view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
-                            if (addressSearch.indexOf('Lieu-dit') != -1) {
-                            	view.setZoom(18);
-                            } else {
-                            	view.setZoom(20);
-                            	 marker.setPosition(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
-                            }
-                		}
-                	}); 
-                }
-            }
-        };
-        //$("#searchInput").easyAutocomplete(options);
-        
-       $("#searchInput").autocomplete({
-            source: dataAutocomplete,
-            appendTo: "#addressForm",
-            delay: 200,
-            minLength: 3,
-        });
-        
-        $("#searchInput").on( "autocompleteselect", function(event, ui) {
-        	var addressSearch = ui.item.value;
-        	dataAutocompleteCoordinates.forEach(function(data) {
-        		if (data[0] == addressSearch) {
-        			var xyCoord = [data[1], data[2]];
-                    view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
-                    if (addressSearch.indexOf('Lieu-dit') != -1) {
-                    	view.setZoom(18);
-                    } else {
-                    	view.setZoom(20);
-                    	 marker.setPosition(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
-                    }
-        		}
-        	});
-        });
-        
-        
-        $('.ui-autocomplete').css('max-height','40%');
-        $('.ui-autocomplete').css('max-width','90%');
-        $('.ui-autocomplete').css('overflow-y','auto');
-        $('.ui-autocomplete').css('overflow-x','hidden');
- 
-        
-   /* $("#searchInput").on('autocompleteclose', function(event, ui) {
-        	$('#ui-id-1').css('display', 'block');
-        });*/
-        
-            
-    /**
-     * method: searchLocality
-     * Queries the api RVA (Référentiel Voies et Adresses) of Rennes Metropole to find locality
-     * @param {string} adressAsked address to find
-     */
-    function searchLocality(adressAsked) {
-        var request = 'https://api-rva.sig.rennesmetropole.fr/?key=556ead9b7893a352bcf9&version=1.0&format=json&epsg=3948&cmd=getlanes&insee=all&query=' + adressAsked;
-        $.getJSON(request, function(dataApiJson) {
-            var answer = dataApiJson.rva.answer;
-            // if several addresses was found
-            if (answer.lanes.length > 0) {
-                var lowerCornerSplit = answer.lanes[0].lowerCorner.split([' ']);
-                var upperCornerSplit = answer.lanes[0].upperCorner.split([' ']);
-                var xyCoordUp = [upperCornerSplit[0], upperCornerSplit[1]];
-                view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoordUp));
-                view.setZoom(18);
-            } else {
-                 //searchPlace();
-            	messagePopup(tr("adresse non trouvée"));
-            }
-        });
-    }
-    
-    /**
-     * method: searchAddress
-     * Queries the api RVA (Référentiel Voies et Adresses) of Rennes Metropole to find a place
-     */
-    function searchAddress() {
-        var adressAsked = $("#searchInput").val();
-        var request = 'https://api-rva.sig.rennesmetropole.fr/?key=556ead9b7893a352bcf9&version=1.0&format=json&epsg=3948&cmd=getfulladdresses&query='+ adressAsked.split(',')[0];
-        var xyCoord;
-        $.getJSON(request, function(dataApiJson) {
-            var addresses = dataApiJson.rva.answer.addresses;
-            // if several addresses was found
-            if (addresses.length > 1) {
-                // if the request ask by the user starts by a number zoom in the street address
-                if (isNaN(parseInt(adressAsked.split(' ')[0])) == false) {
-                    addresses.forEach(function(address) {
-                        if (address.addr2 == adressAsked) {
-                            xyCoord = [address.x, address.y];
-                            view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
-                            view.setZoom(20);
-                        } 
-                    });
-                // else zoom in the street
-                } else {
-                    xyCoord = [addresses[0].x, addresses[0].y];
-                    view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
-                    view.setZoom(19);
-                }
-            // if only one adresse was found zoom in this address
-            } else if(addresses.length == 1) {
-                xyCoord = [addresses[0].x, addresses[0].y];
-                view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
-                view.setZoom(20);
-            // if no address was found, call to the function searchPlace
-            } else {
-                searchLocality(adressAsked.split(',')[0]);
-            }
-        });
-        return false;
-    }
-    /**
-     * method: sendInformationToParentPage
-     * send link parms to the parent page
-     * used if the sviewer is in an iframe 
-     */
-    function sendInformationToParentPage() {
-	    var c = view.getCenter();
-	    var linkParams = {};
-	    if (config.gficoord && config.gfiz && config.gfiok) {
-	        linkParams.x = encodeURIComponent(Math.round(config.gficoord[0]));
-	        linkParams.y = encodeURIComponent(Math.round(config.gficoord[1]));
-	        linkParams.z = encodeURIComponent(config.gfiz);
-	        linkParams.q = '1';
-	    }
-	    else {
-	    	if ( c!= null) {
-		        linkParams.x = encodeURIComponent(Math.round(c[0]));
-		        linkParams.y = encodeURIComponent(Math.round(c[1]));
-		        linkParams.z = encodeURIComponent(view.getZoom());
-	    	}
-	    }
-	    linkParams.lb = encodeURIComponent(config.lb);
-	    if (config.customConfigName) { linkParams.c = config.customConfigName; }
-	    if (config.kmlUrl) { linkParams.kml = config.kmlUrl; }
-	    if (config.search) { linkParams.s = '1'; }
-	    if (config.layersQueryString) { linkParams.layers = config.layersQueryString; }
-	    if (config.title&&config.wmctitle!=config.title) { linkParams.title = config.title; }
-	    if (config.wmc) { linkParams.wmc = config.wmc; }
-
-	    try{
-	    	if (typeof parent.interactWithSviewer === "function") {
-	    		var parentOrigin = parent.location.origin;
-	    		var documentOrigin = document.location.origin; 
-	    		if (parentOrigin == documentOrigin) {
-	    			parent.interactWithSviewer(linkParams);
-	    		}
-	    	}
-	    }catch(e){
-	        // not accessible
-	    }
-    }
-//----------------------------------------------------------------------------------------------------------------------
     // panel size and placement to fit small screens
     function panelLayout (e) {
         var panel = $(this);
@@ -1271,7 +1067,9 @@ ol.extent.getTopRight(extent).reverse().join(" "),
     // updates title on keypress
     function onTitle(e) {
         setTitle($("#setTitle").val());
-        sendInformationToParentPage();
+        // Debut modif CT 25/09/2019
+        searchRVA.sendInformationToParentPage();
+        // FIN
     }
 
     // Zoom +
@@ -1283,7 +1081,9 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         });
         map.beforeRender(zoom);
         view.setZoom(view.getZoom()+1);
-        sendInformationToParentPage();
+        // Debut modif CT 25/09/2019
+        searchRVA.sendInformationToParentPage();
+        // FIN
     }
 
     //Zoom -
@@ -1295,7 +1095,9 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         });
         map.beforeRender(zoom);
         view.setZoom(view.getZoom()-1);
-        sendInformationToParentPage();
+        // Debut modif CT 25/09/2019
+        searchRVA.sendInformationToParentPage();
+        // FIN
     }
 
     // Back to initial extent
@@ -1315,7 +1117,9 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         map.beforeRender(pan, zoom);
         view.fit(config.initialExtent, map.getSize());
         view.setRotation(0);
-        sendInformationToParentPage();
+        // Debut modif CT 25/09/2019
+        searchRVA.sendInformationToParentPage();
+        // FIN
     }
     
     // recenter on device position
@@ -1384,6 +1188,7 @@ ol.extent.getTopRight(extent).reverse().join(" "),
      * configname MUST MATCH ^[A-Za-z0-9_-]+$
      */
     function init() {
+        
         var qsconfig;
         if (qs.c && qs.c.match(/^[A-Za-z0-9_-]+$/)) {
             qsconfig = "etc/customConfig_"+qs.c+".js";
@@ -1391,11 +1196,13 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         else {
             qsconfig = "etc/customConfig.js";
         }
+
         $.getScript(qsconfig)
             .done(function() {
                 // transmits config name for persistency
                 customConfig.customConfigName = qs.c;
                 doConfiguration();
+               // background layer chargés
                 doMap();
                 doGUI();
             })
@@ -1414,6 +1221,7 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         // browser language
         var language = ((navigator.language) ? navigator.language : navigator.userLanguage).substring(0,2);
 
+
         // current config
         config = {
             lang: ((hardConfig.i18n.hasOwnProperty(language)) ? language : 'en'),
@@ -1424,6 +1232,29 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         };
         $.extend(config, hardConfig);
         $.extend(config, customConfig);
+
+        // debut modif CT 27/09/2019
+        if (typeof (config.wmtsBackgroundLayersNames) !== 'undefined') {
+            var layersBackground = [];
+
+            var backgroundLayersNames = config.wmtsBackgroundLayersNames.split(',');
+
+            backgroundLayersNames.forEach(function (wmtsLayerName) {
+
+                var wmtsLayer = ol.source.WMTS.optionsFromCapabilities(wmtsData, {
+                    format: 'image/png',
+                    layer: wmtsLayerName,
+                    matrixSet: 'EPSG:3857',
+                    url: 'https://public.sig.rennesmetropole.fr/geowebcache/service/tms/1.0.0/'+ encodeURI(wmtsLayerName) +'@EPSG%3A3857@png/'
+                });
+
+                layersBackground.push(new ol.layer.Tile({ source: new ol.source.WMTS(wmtsLayer) }));
+
+            });
+
+            config.layersBackground = layersBackground;
+        }
+        // FIN
 
         config.projection = ol.proj.get(config.projcode);
 
@@ -1500,6 +1331,9 @@ ol.extent.getTopRight(extent).reverse().join(" "),
             config.searchparams = {};
             $("#addressForm label").text('Features or ' + $("#addressForm label").text());
         }
+
+        console.log(config);
+
     }
 
 
@@ -1511,6 +1345,10 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         view = new ol.View({
             projection: config.projection
         });
+        // Debut modif CT 25/09/2019
+        searchRVA.setView(view);
+        // FIN
+
         console.log(config.projection);
         console.log(config.projcode);
         map = new ol.Map({
@@ -1530,7 +1368,9 @@ ol.extent.getTopRight(extent).reverse().join(" "),
                 map.addLayer(this);
             }
         );
+
         switchBackground(config.lb);
+
 
         // adding WMS layers from georchestra map (WMC)
         // try wmc=58a713a089cf408419b871b73110b7cb on dev.geobretagne.fr
@@ -1583,12 +1423,16 @@ ol.extent.getTopRight(extent).reverse().join(" "),
             stopEvent: false
         });
         map.addOverlay(marker);
+        // debut modif CT 25/09/2019
+        searchRVA.setMarker(marker);
+        // Fin
     }
 
     /**
      * initiates GUI
      */
     function doGUI() {
+
         // opens permalink tab if required
         if (qs.qr) {
             setPermalink();
@@ -1614,12 +1458,13 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         // geolocation form
         $('#zpBt').click(locateMe);
         //$('#addressForm').on('submit', searchPlace); //Original
-     // branchement  RVA ---------------------------
+
+        // Debut modif CT 25/09/2019
         //$('#searchInput').attr('list','adressesList');
         //$('#searchInput').append('<datalist id="adressesList" class="option-list"></datalist>');
-        $('#addressForm').on('submit', searchAddress);
-        $('#addressForm').on('input', getAddressesAsked);
-        // --------------------------------------------
+        $('#addressForm').on('submit', searchRVA.searchAddress);
+        $('#addressForm').on('input', searchRVA.getAddressesAsked);
+        // Fin
 
         // set title dialog
         $('#setTitle').keyup(onTitle);
@@ -1659,8 +1504,23 @@ ol.extent.getTopRight(extent).reverse().join(" "),
 
     // ------ Main ------------------------------------------------------------------------------------------
 
-    init();
+    // debut modif CT 27/09/2019
+
+   var parser = new ol.format.WMTSCapabilities();
+
+    var wmtsCapabilities = 'https://public.sig.rennesmetropole.fr/geowebcache/service/wmts?REQUEST=GetCapabilities&SERVICE=WMTS&VERSION=1.3.0';
     
+    var wmtsData;
+    
+    fetch(wmtsCapabilities).then(function(response) {
+        return response.text();
+    }).then(function(data) {
+        wmtsData = parser.read(data);
+
+        init();
+    });
+    // FIN
+
 
 };
 
