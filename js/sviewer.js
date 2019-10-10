@@ -5,14 +5,15 @@ proj4.defs([
     ["EPSG:4326", "+title=WGS 84, +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"],
     ["EPSG:3857", "+title=Web Spherical Mercator, +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +no_defs"],
     ["EPSG:900913", "+title=Web Spherical Mercator, +proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +no_defs"],
-    ["EPSG:2154", "+title=RGF-93/Lambert 93, +proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"]
+    ["EPSG:2154", "+title=RGF-93/Lambert 93, +proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"],
+    ["EPSG:3948", "+proj=lcc +lat_1=47.25 +lat_2=48.75 +lat_0=48 +lon_0=3 +x_0=1700000 +y_0=7200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"]
 ]);
 
 var config = {};
 var customConfig = {};
 var hardConfig = {
     title: 'geOrchestra mobile',
-    geOrchestraBaseUrl: 'https://sdi.georchestra.org/',
+    geOrchestraBaseUrl: 'https://public.sig.rennesmetropole.fr/',
     projcode: 'EPSG:3857',
     initialExtent: [-12880000,-1080000,5890000,7540000],
     maxExtent: [-20037508.34, -20037508.34, 20037508.34, 20037508.34],
@@ -342,6 +343,7 @@ var SViewer = function() {
             config.lb = (lv+1)%n;
             config.layersBackground[config.lb].setVisible(true);
         }
+        sendInformationToParentPage();
         return config.layersBackground[config.lb];
     }
 
@@ -483,6 +485,7 @@ var SViewer = function() {
             }
             $('#permalink').prop('href',permalinkQuery);
         }
+        sendInformationToParentPage();
     }
 
 
@@ -1004,7 +1007,223 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         }
         return false;
     }
+//-------------------------------Rennes métropole---------------------------------------------------------------------------    
+    
+    dataAutocomplete = []; // store addresses and localities names. Used to display in autocompletion
+    dataAutocompleteCoordinates = []; // store addresses and localities names and coordinates. Used to display matching address or locality on the map
+    
+    /**
+     * method: getAddressesAsked
+     * Queries the api RVA (Référentiel Voies et Adresses) of Rennes Metropole 
+     * to find matching addresses and localities 
+     */
+    function getAddressesAsked() {
+    	dataAutocompleteCoordinates.splice(0, dataAutocompleteCoordinates.length);
+        dataAutocomplete.splice(0, dataAutocomplete.length);
+    	var adressAsked = $("#searchInput").val();
+    	var adressAskedSplit = adressAsked.split(','); 
+    	var adressAskedLowerCase = adressAsked.toLowerCase();
+    	var requestLanes = 'https://api-rva.sig.rennesmetropole.fr/?key=556ead9b7893a352bcf9&version=1.0&format=json&epsg=3948&cmd=getlanes&insee=all&query=' + adressAskedSplit[0];
+    	var requestAddresses = 'https://api-rva.sig.rennesmetropole.fr/?key=556ead9b7893a352bcf9&version=1.0&format=json&epsg=3948&cmd=getfulladdresses&query='+ adressAskedSplit[0];
+    	
+    	if (adressAskedSplit[0].length > 5) {
+	    	$.getJSON(requestLanes, function(dataApiJson) {
+	    		var data = dataApiJson.rva.answer;
+	    		if ((data.lanes).length > 0) {
+	    			data.lanes.forEach(function(lane) {
+	    				if (lane.type == 'Lieu-dit') {
+	    					var localityName = lane.name4 + ' (Lieu-dit)';
+	    					dataAutocomplete.push(localityName);
+	    					var laneUpperCornerSplit = lane.upperCorner.split(' ');
+	    					var laneInformations = [localityName, laneUpperCornerSplit[0], laneUpperCornerSplit[1]];
+	    					dataAutocompleteCoordinates.push(laneInformations);
+	    				}
+	    			});
+	    		 }
+	    	});
+	    	
+	    	$.getJSON(requestAddresses, function(dataApiJson) {
+	    		var data = dataApiJson.rva.answer;
+	    		if ( ((data.addresses).length > 0 )  ) {
+	    			data.addresses.forEach(function(address) {
+		    			if( ((address.addr3.toLowerCase().substring(0, adressAskedLowerCase.length)) == adressAskedLowerCase)
+		    				|| ((address.addr3.toLowerCase().includes(adressAskedLowerCase)) == true)) {
+		    				if (dataAutocomplete.indexOf(address.addr3) == -1) {
+		    					dataAutocomplete.push(address.addr3);
+			    				var addressInformations = [address.addr3, address.x, address.y];
+			    				dataAutocompleteCoordinates.push(addressInformations);
+		    				}
+	    				}
+	    			});
+	    		}
+	    	});
+    	}
+    }
+    
+    var options = {
+            minCharNumber: 3,
+            adjustWidth: false,
+            data: dataAutocomplete,
+            requestDelay: 150,
+            list: {
+                onClickEvent: function() {
+                	var addressSearch = $("#searchInput").val();
+                	dataAutocompleteCoordinates.forEach(function(data) {
+                		if (data[0] == addressSearch) {
+                			var xyCoord = [data[1], data[2]];
+                            view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
+                            if (addressSearch.indexOf('Lieu-dit') != -1) {
+                            	view.setZoom(18);
+                            } else {
+                            	view.setZoom(20);
+                            	 marker.setPosition(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
+                            }
+                		}
+                	}); 
+                }
+            }
+        };
+        //$("#searchInput").easyAutocomplete(options);
+        
+       $("#searchInput").autocomplete({
+            source: dataAutocomplete,
+            appendTo: "#addressForm",
+            delay: 200,
+            minLength: 3,
+        });
+        
+        $("#searchInput").on( "autocompleteselect", function(event, ui) {
+        	var addressSearch = ui.item.value;
+        	dataAutocompleteCoordinates.forEach(function(data) {
+        		if (data[0] == addressSearch) {
+        			var xyCoord = [data[1], data[2]];
+                    view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
+                    if (addressSearch.indexOf('Lieu-dit') != -1) {
+                    	view.setZoom(18);
+                    } else {
+                    	view.setZoom(20);
+                    	 marker.setPosition(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
+                    }
+        		}
+        	});
+        });
+        
+        
+        $('.ui-autocomplete').css('max-height','40%');
+        $('.ui-autocomplete').css('max-width','90%');
+        $('.ui-autocomplete').css('overflow-y','auto');
+        $('.ui-autocomplete').css('overflow-x','hidden');
+ 
+        
+   /* $("#searchInput").on('autocompleteclose', function(event, ui) {
+        	$('#ui-id-1').css('display', 'block');
+        });*/
+        
+            
+    /**
+     * method: searchLocality
+     * Queries the api RVA (Référentiel Voies et Adresses) of Rennes Metropole to find locality
+     * @param {string} adressAsked address to find
+     */
+    function searchLocality(adressAsked) {
+        var request = 'https://api-rva.sig.rennesmetropole.fr/?key=556ead9b7893a352bcf9&version=1.0&format=json&epsg=3948&cmd=getlanes&insee=all&query=' + adressAsked;
+        $.getJSON(request, function(dataApiJson) {
+            var answer = dataApiJson.rva.answer;
+            // if several addresses was found
+            if (answer.lanes.length > 0) {
+                var lowerCornerSplit = answer.lanes[0].lowerCorner.split([' ']);
+                var upperCornerSplit = answer.lanes[0].upperCorner.split([' ']);
+                var xyCoordUp = [upperCornerSplit[0], upperCornerSplit[1]];
+                view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoordUp));
+                view.setZoom(18);
+            } else {
+                 //searchPlace();
+            	messagePopup(tr("adresse non trouvée"));
+            }
+        });
+    }
+    
+    /**
+     * method: searchAddress
+     * Queries the api RVA (Référentiel Voies et Adresses) of Rennes Metropole to find a place
+     */
+    function searchAddress() {
+        var adressAsked = $("#searchInput").val();
+        var request = 'https://api-rva.sig.rennesmetropole.fr/?key=556ead9b7893a352bcf9&version=1.0&format=json&epsg=3948&cmd=getfulladdresses&query='+ adressAsked.split(',')[0];
+        var xyCoord;
+        $.getJSON(request, function(dataApiJson) {
+            var addresses = dataApiJson.rva.answer.addresses;
+            // if several addresses was found
+            if (addresses.length > 1) {
+                // if the request ask by the user starts by a number zoom in the street address
+                if (isNaN(parseInt(adressAsked.split(' ')[0])) == false) {
+                    addresses.forEach(function(address) {
+                        if (address.addr2 == adressAsked) {
+                            xyCoord = [address.x, address.y];
+                            view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
+                            view.setZoom(20);
+                        } 
+                    });
+                // else zoom in the street
+                } else {
+                    xyCoord = [addresses[0].x, addresses[0].y];
+                    view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
+                    view.setZoom(19);
+                }
+            // if only one adresse was found zoom in this address
+            } else if(addresses.length == 1) {
+                xyCoord = [addresses[0].x, addresses[0].y];
+                view.setCenter(proj4('EPSG:3948', 'EPSG:3857', xyCoord));
+                view.setZoom(20);
+            // if no address was found, call to the function searchPlace
+            } else {
+                searchLocality(adressAsked.split(',')[0]);
+            }
+        });
+        return false;
+    }
+    /**
+     * method: sendInformationToParentPage
+     * send link parms to the parent page
+     * used if the sviewer is in an iframe 
+     */
+    function sendInformationToParentPage() {
+	    var c = view.getCenter();
+	    var linkParams = {};
+	    if (config.gficoord && config.gfiz && config.gfiok) {
+	        linkParams.x = encodeURIComponent(Math.round(config.gficoord[0]));
+	        linkParams.y = encodeURIComponent(Math.round(config.gficoord[1]));
+	        linkParams.z = encodeURIComponent(config.gfiz);
+	        linkParams.q = '1';
+	    }
+	    else {
+	    	if ( c!= null) {
+		        linkParams.x = encodeURIComponent(Math.round(c[0]));
+		        linkParams.y = encodeURIComponent(Math.round(c[1]));
+		        linkParams.z = encodeURIComponent(view.getZoom());
+	    	}
+	    }
+	    linkParams.lb = encodeURIComponent(config.lb);
+	    if (config.customConfigName) { linkParams.c = config.customConfigName; }
+	    if (config.kmlUrl) { linkParams.kml = config.kmlUrl; }
+	    if (config.search) { linkParams.s = '1'; }
+	    if (config.layersQueryString) { linkParams.layers = config.layersQueryString; }
+	    if (config.title&&config.wmctitle!=config.title) { linkParams.title = config.title; }
+	    if (config.wmc) { linkParams.wmc = config.wmc; }
 
+	    try{
+	    	if (typeof parent.interactWithSviewer === "function") {
+	    		var parentOrigin = parent.location.origin;
+	    		var documentOrigin = document.location.origin; 
+	    		if (parentOrigin == documentOrigin) {
+	    			parent.interactWithSviewer(linkParams);
+	    		}
+	    	}
+	    }catch(e){
+	        // not accessible
+	    }
+    }
+//----------------------------------------------------------------------------------------------------------------------
     // panel size and placement to fit small screens
     function panelLayout (e) {
         var panel = $(this);
@@ -1030,6 +1249,9 @@ ol.extent.getTopRight(extent).reverse().join(" "),
             }
             else {
                 $('#'+id).popup('open');
+                if (id == 'panelLocate') {
+                	 $('#searchInput').select();
+                }
             }
         });
     }
@@ -1049,6 +1271,7 @@ ol.extent.getTopRight(extent).reverse().join(" "),
     // updates title on keypress
     function onTitle(e) {
         setTitle($("#setTitle").val());
+        sendInformationToParentPage();
     }
 
     // Zoom +
@@ -1060,6 +1283,7 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         });
         map.beforeRender(zoom);
         view.setZoom(view.getZoom()+1);
+        sendInformationToParentPage();
     }
 
     //Zoom -
@@ -1071,6 +1295,7 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         });
         map.beforeRender(zoom);
         view.setZoom(view.getZoom()-1);
+        sendInformationToParentPage();
     }
 
     // Back to initial extent
@@ -1090,6 +1315,7 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         map.beforeRender(pan, zoom);
         view.fit(config.initialExtent, map.getSize());
         view.setRotation(0);
+        sendInformationToParentPage();
     }
     
     // recenter on device position
@@ -1375,7 +1601,9 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         });
         map.on('moveend', setPermalink);
         $('#marker').click(clearQuery);
-
+        
+        
+        //------------------------------
 
         // map buttons
         $('#ziBt').click(zoomIn);
@@ -1385,7 +1613,13 @@ ol.extent.getTopRight(extent).reverse().join(" "),
 
         // geolocation form
         $('#zpBt').click(locateMe);
-        $('#addressForm').on('submit', searchPlace);
+        //$('#addressForm').on('submit', searchPlace); //Original
+     // branchement  RVA ---------------------------
+        //$('#searchInput').attr('list','adressesList');
+        //$('#searchInput').append('<datalist id="adressesList" class="option-list"></datalist>');
+        $('#addressForm').on('submit', searchAddress);
+        $('#addressForm').on('input', getAddressesAsked);
+        // --------------------------------------------
 
         // set title dialog
         $('#setTitle').keyup(onTitle);
@@ -1422,7 +1656,6 @@ ol.extent.getTopRight(extent).reverse().join(" "),
             );
         }
     }
-
 
     // ------ Main ------------------------------------------------------------------------------------------
 
