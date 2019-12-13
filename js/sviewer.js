@@ -1234,24 +1234,26 @@ ol.extent.getTopRight(extent).reverse().join(" "),
         $.extend(config, customConfig);
 
         // debut modif CT 27/09/2019
-        if (typeof (config.wmtsBackgroundLayersNames) !== 'undefined') {
+        if (typeof (config.wmtsBackgroundLayers) !== 'undefined') {
             var layersBackground = [];
 
-            var backgroundLayersNames = config.wmtsBackgroundLayersNames.split(',');
+            //var backgroundLayersNames = config.wmtsBackgroundLayers.split(',');
+            var backgroundLayersNames = config.wmtsBackgroundLayers;
 
             backgroundLayersNames.forEach(function (wmtsLayerName) {
+                var format = 'image/' + wmtsLayerName.pictureType;
 
                 var wmtsLayer = ol.source.WMTS.optionsFromCapabilities(wmtsData, {
-                    format: 'image/png',
-                    layer: wmtsLayerName,
+                    format: format,
+                    layer: wmtsLayerName.name,
                     matrixSet: 'EPSG:3857',
-                    url: 'https://public.sig.rennesmetropole.fr/geowebcache/service/tms/1.0.0/'+ encodeURI(wmtsLayerName) +'@EPSG%3A3857@png/'
+                    url: 'https://public.sig.rennesmetropole.fr/geowebcache/service/tms/1.0.0/'+ encodeURI(wmtsLayerName.name) +'@EPSG%3A3857@png/'
                 });
 
+                //console.log(new ol.layer.Tile({ source: new ol.source.WMTS(wmtsLayer) }));
                 layersBackground.push(new ol.layer.Tile({ source: new ol.source.WMTS(wmtsLayer) }));
 
             });
-
             config.layersBackground = layersBackground;
         }
         // FIN
@@ -1331,9 +1333,6 @@ ol.extent.getTopRight(extent).reverse().join(" "),
             config.searchparams = {};
             $("#addressForm label").text('Features or ' + $("#addressForm label").text());
         }
-
-        console.log(config);
-
     }
 
 
