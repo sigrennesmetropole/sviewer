@@ -247,7 +247,8 @@ var SViewer = function() {
             return url;
         }
         else {
-            return  '/proxy/?url=' + encodeURIComponent(url);
+            //return  '/proxy/?url=' + encodeURIComponent(url);
+            return  url;
         }
     }
 
