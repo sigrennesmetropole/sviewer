@@ -87,9 +87,9 @@ var SViewer = function() {
 
             self.options.namespace = (self.options.nslayername.indexOf(":")>0) ? self.options.nslayername.split(':',2)[0]:''; // namespace
             self.options.layername = (self.options.nslayername.indexOf(':')>0) ? self.options.nslayername.split(':',2)[1]:''; // layername
-            self.options.wmsurl_global = config.geOrchestraBaseUrl + '/geoserver/wms'; // global getcap
-            self.options.wmsurl_ns = config.geOrchestraBaseUrl + '/geoserver/' + self.options.namespace + '/wms'; // virtual getcap namespace
-            self.options.wmsurl_layer = config.geOrchestraBaseUrl + '/geoserver/' + self.options.namespace + '/' + self.options.layername + '/wms'; // virtual getcap layer
+            self.options.wmsurl_global = config.geOrchestraBaseUrl + 'geoserver/wms'; // global getcap
+            self.options.wmsurl_ns = config.geOrchestraBaseUrl + 'geoserver/' + self.options.namespace + '/wms'; // virtual getcap namespace
+            self.options.wmsurl_layer = config.geOrchestraBaseUrl + 'geoserver/' + self.options.namespace + '/' + self.options.layername + '/wms'; // virtual getcap layer
         }
 
         /**
